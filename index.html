@@ -3,20 +3,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GIF Düzenleyici</title>
+    <title>Gelişmiş GIF Düzenleyici</title>
     <script src="https://cdn.jsdelivr.net/npm/omggif@1.0.10/omggif.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/gif.js@0.2.0/dist/gif.js"></script>
-    <!-- APNG Sıkıştırma Bağımlılığı -->
     <script src="https://cdn.jsdelivr.net/npm/pako@2.1.0/dist/pako.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/upng-js@2.1.0/UPNG.min.js"></script>
     <style>
         :root {
-            --bg-color: #121214;
-            --panel-bg: #1e1e24;
+            --bg-color: #09090b;
+            --panel-bg: #18181b;
             --accent-color: #6366f1;
             --accent-hover: #4f46e5;
-            --text-color: #f3f4f6;
-            --border-color: #374151;
+            --text-color: #f4f4f5;
+            --border-color: #27272a;
             --error-color: #ef4444;
         }
 
@@ -50,12 +49,15 @@
             padding: 20px;
             position: relative;
             user-select: none;
+            background: #000000;
         }
 
         h2 {
             margin: 0 0 10px 0;
-            font-size: 1.1rem;
+            font-size: 1rem;
             color: #fff;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
         }
 
         .section {
@@ -64,21 +66,35 @@
         }
 
         label {
-            display: block;
+            display: flex;
+            align-items: center;
+            gap: 8px;
             margin-bottom: 4px;
             font-size: 0.8rem;
-            color: #9ca3af;
+            color: #a1a1aa;
         }
 
         input[type="text"], input[type="number"], select {
             width: 100%;
             padding: 8px;
-            background: #111827;
+            background: #09090b;
             border: 1px solid var(--border-color);
             border-radius: 4px;
             color: #fff;
             box-sizing: border-box;
             margin-bottom: 8px;
+        }
+
+        .checkbox-label {
+            cursor: pointer;
+            color: #fff;
+            font-weight: 500;
+            user-select: none;
+        }
+
+        .checkbox-label input {
+            width: auto;
+            margin: 0;
         }
 
         .row {
@@ -116,48 +132,24 @@
         #editor-container {
             position: relative;
             display: inline-block;
-            max-width: 100%;
+            max-width: 90vw;
             max-height: 80vh;
-            border: 2px dashed var(--border-color);
+            border: 1px solid var(--border-color);
             border-radius: 8px;
             overflow: hidden;
-            background: #18181b;
+            background: #111;
         }
 
         #drop-instructions {
             padding: 60px 40px;
             text-align: center;
-            color: #6b7280;
+            color: #71717a;
         }
 
         canvas {
             display: block;
-            max-width: 100%;
-            max-height: 80vh;
+            cursor: crosshair;
         }
-
-        #crop-box {
-            position: absolute;
-            border: 2px dashed #6366f1;
-            box-sizing: border-box;
-            cursor: move;
-            display: none;
-            pointer-events: auto;
-        }
-
-        .handle {
-            position: absolute;
-            width: 10px;
-            height: 10px;
-            background: #ffffff;
-            border: 1px solid #6366f1;
-            border-radius: 50%;
-        }
-
-        .handle.tl { top: -5px; left: -5px; cursor: nwse-resize; }
-        .handle.tr { top: -5px; right: -5px; cursor: nesw-resize; }
-        .handle.bl { bottom: -5px; left: -5px; cursor: nesw-resize; }
-        .handle.br { bottom: -5px; right: -5px; cursor: nwse-resize; }
 
         #status-bar {
             position: absolute;
@@ -175,6 +167,14 @@
             border-color: var(--error-color);
             color: #fca5a5;
         }
+
+        .info-badge {
+            font-size: 0.75rem;
+            color: #a1a1aa;
+            margin-top: -4px;
+            margin-bottom: 8px;
+            line-height: 1.3;
+        }
     </style>
 </head>
 <body>
@@ -188,32 +188,43 @@
         </div>
 
         <div class="section">
-            <h2>Kırpma / Çerçeve Ayarları</h2>
-            <button id="fit-1200-btn" style="background: #10b981; margin-bottom: 10px;">1200x134 Siyah Doldur / Sıfırla</button>
+            <h2>Çerçeve Ayarları</h2>
+            <label class="checkbox-label">
+                <input type="checkbox" id="lock-ratio-check" checked>
+                Oranı Sabitle (Çıktı Oranı)
+            </label>
+            <p class="info-badge">Çerçeveyi boyutlandırırken en/boy oranını korur.</p>
+            <button id="fit-1200-btn" style="background: #10b981; margin-bottom: 10px;">Çerçeveyi Sıfırla (1200x134 Oranı)</button>
             <div class="row">
                 <div>
-                    <label>Sol (X)</label>
-                    <input type="number" id="crop-x" value="0">
-                </div>
-                <div>
-                    <label>Üst (Y)</label>
-                    <input type="number" id="crop-y" value="0">
-                </div>
-            </div>
-            <div class="row">
-                <div>
-                    <label>Genişlik</label>
+                    <label>Çerçeve W</label>
                     <input type="number" id="crop-w">
                 </div>
                 <div>
-                    <label>Yükseklik</label>
+                    <label>Çerçeve H</label>
                     <input type="number" id="crop-h">
                 </div>
             </div>
         </div>
 
         <div class="section">
-            <h2>Çıktı Boyutu</h2>
+            <h2>GIF Görsel Ayarları</h2>
+            <p class="info-badge">Ekranda fare ile GIF'i tutup sürükleyebilirsiniz.</p>
+            <div class="row">
+                <div>
+                    <label>GIF Genişlik</label>
+                    <input type="number" id="gif-w">
+                </div>
+                <div>
+                    <label>GIF Yükseklik</label>
+                    <input type="number" id="gif-h">
+                </div>
+            </div>
+            <button id="center-gif-btn" style="background: #3b82f6;">GIF'i Çerçeveye Ortala</button>
+        </div>
+
+        <div class="section">
+            <h2>Nihai Çıktı Boyutu</h2>
             <div class="row">
                 <div>
                     <label>Genişlik (px)</label>
@@ -269,13 +280,7 @@
                 <p style="font-size: 1.2rem; margin-bottom: 5px;">GIF dosyasını buraya sürükleyin</p>
                 <p style="font-size: 0.85rem;">veya sol panelden dosya seçin</p>
             </div>
-            <canvas id="preview-canvas"></canvas>
-            <div id="crop-box">
-                <div class="handle tl"></div>
-                <div class="handle tr"></div>
-                <div class="handle bl"></div>
-                <div class="handle br"></div>
-            </div>
+            <canvas id="preview-canvas" style="display:none;"></canvas>
         </div>
         <div id="status-bar"></div>
     </div>
@@ -285,7 +290,6 @@
         const editorContainer = document.getElementById('editor-container');
         const dropInstructions = document.getElementById('drop-instructions');
         const previewCanvas = document.getElementById('preview-canvas');
-        const cropBox = document.getElementById('crop-box');
         const ctx = previewCanvas.getContext('2d');
         const statusBar = document.getElementById('status-bar');
 
@@ -296,8 +300,15 @@
         let currentFrameIndex = 0;
         let workerBlobUrl = null;
 
-        let cropData = { x: 0, y: 0, w: 0, h: 0 };
+        let cropData = { x: 0, y: 0, w: 1200, h: 134 };
+        let gifData = { x: 0, y: 0, w: 0, h: 0 };
         let viewBounds = { minX: 0, minY: 0, viewW: 0, viewH: 0 };
+
+        let isInteracting = false;
+        let dragMode = null; // 'move-gif', 'move-frame', 'resize-handle'
+        let activeHandle = null;
+        let dragStartX = 0, dragStartY = 0;
+        let startCrop = {}, startGif = {};
 
         async function initWorker() {
             try {
@@ -370,9 +381,10 @@
                         });
                     }
 
+                    gifData = { x: 0, y: 0, w: originalWidth, h: originalHeight };
+                    
                     dropInstructions.style.display = 'none';
                     previewCanvas.style.display = 'block';
-                    cropBox.style.display = 'block';
 
                     autoFit1200x134();
                     hideStatus();
@@ -386,23 +398,31 @@
             reader.readAsArrayBuffer(file);
         }
 
+        function getTargetRatio() {
+            const tw = parseInt(document.getElementById('width-input').value) || 1200;
+            const th = parseInt(document.getElementById('height-input').value) || 134;
+            return tw / th;
+        }
+
         function autoFit1200x134() {
-            const targetRatio = 1200 / 134;
+            const ratio = getTargetRatio();
             const cropH = originalHeight;
-            const cropW = cropH * targetRatio;
+            const cropW = cropH * ratio;
             const cropX = - (cropW - originalWidth) / 2;
             const cropY = 0;
 
             cropData = { x: cropX, y: cropY, w: cropW, h: cropH };
-            updateInputsFromCropData();
-            syncCropBoxUI();
+            gifData = { x: 0, y: 0, w: originalWidth, h: originalHeight };
+
+            updateInputs();
         }
 
         function calculateViewBounds() {
-            const minX = Math.min(0, cropData.x);
-            const minY = Math.min(0, cropData.y);
-            const maxX = Math.max(originalWidth, cropData.x + cropData.w);
-            const maxY = Math.max(originalHeight, cropData.y + cropData.h);
+            const padding = 40;
+            const minX = Math.min(gifData.x, cropData.x) - padding;
+            const minY = Math.min(gifData.y, cropData.y) - padding;
+            const maxX = Math.max(gifData.x + gifData.w, cropData.x + cropData.w) + padding;
+            const maxY = Math.max(gifData.y + gifData.h, cropData.y + cropData.h) + padding;
 
             viewBounds = {
                 minX: minX,
@@ -433,22 +453,24 @@
                 previewCanvas.width = viewBounds.viewW;
                 previewCanvas.height = viewBounds.viewH;
 
-                // 1. Dış Alan Temizliği
-                ctx.clearRect(0, 0, viewBounds.viewW, viewBounds.viewH);
+                ctx.fillStyle = '#111113';
+                ctx.fillRect(0, 0, viewBounds.viewW, viewBounds.viewH);
 
-                // 2. Siyah Kırpma/Çerçeve Alanını Çiz
+                const cX = cropData.x - viewBounds.minX;
+                const cY = cropData.y - viewBounds.minY;
+                const gX = gifData.x - viewBounds.minX;
+                const gY = gifData.y - viewBounds.minY;
+
                 ctx.fillStyle = '#000000';
-                ctx.fillRect(
-                    cropData.x - viewBounds.minX,
-                    cropData.y - viewBounds.minY,
-                    cropData.w,
-                    cropData.h
-                );
+                ctx.fillRect(cX, cY, cropData.w, cropData.h);
 
-                // 3. Orijinal GIF karesini çiz
-                ctx.drawImage(currentFrame.canvas, -viewBounds.minX, -viewBounds.minY);
+                ctx.save();
+                ctx.beginPath();
+                ctx.rect(cX, cY, cropData.w, cropData.h);
+                ctx.clip();
 
-                // 4. Metin Katmanı
+                ctx.drawImage(currentFrame.canvas, gX, gY, gifData.w, gifData.h);
+
                 const text = document.getElementById('text-input').value;
                 if (text) {
                     const textSize = document.getElementById('text-size').value;
@@ -458,8 +480,11 @@
 
                     ctx.font = `${textSize}px Arial`;
                     ctx.fillStyle = textColor;
-                    ctx.fillText(text, textX - viewBounds.minX, textY - viewBounds.minY);
+                    ctx.fillText(text, cX + textX, cY + textY);
                 }
+                ctx.restore();
+
+                drawUIOverlay(cX, cY, gX, gY);
 
                 animationFrameId = requestAnimationFrame(render);
             }
@@ -467,105 +492,183 @@
             animationFrameId = requestAnimationFrame(render);
         }
 
-        function getScaleRatio() {
-            if (!previewCanvas.clientWidth || !viewBounds.viewW) return 1;
-            return previewCanvas.clientWidth / viewBounds.viewW;
+        function drawUIOverlay(cX, cY, gX, gY) {
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+            ctx.setLineDash([4, 4]);
+            ctx.strokeRect(gX, gY, gifData.w, gifData.h);
+
+            ctx.strokeStyle = '#6366f1';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([6, 6]);
+            ctx.strokeRect(cX, cY, cropData.w, cropData.h);
+            ctx.setLineDash([]);
+
+            const handles = getHandlePositions(cX, cY, cropData.w, cropData.h);
+            ctx.fillStyle = '#ffffff';
+            ctx.strokeStyle = '#6366f1';
+            ctx.lineWidth = 1.5;
+
+            handles.forEach(h => {
+                ctx.beginPath();
+                ctx.arc(h.x, h.y, 5, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.stroke();
+            });
         }
 
-        function syncCropBoxUI() {
-            calculateViewBounds();
-            const scale = getScaleRatio();
-
-            cropBox.style.left = ((cropData.x - viewBounds.minX) * scale) + 'px';
-            cropBox.style.top = ((cropData.y - viewBounds.minY) * scale) + 'px';
-            cropBox.style.width = (cropData.w * scale) + 'px';
-            cropBox.style.height = (cropData.h * scale) + 'px';
+        function getHandlePositions(x, y, w, h) {
+            return [
+                { id: 'tl', x: x, y: y },
+                { id: 'tr', x: x + w, y: y },
+                { id: 'bl', x: x, y: y + h },
+                { id: 'br', x: x + w, y: y + h }
+            ];
         }
 
-        function updateInputsFromCropData() {
-            document.getElementById('crop-x').value = Math.round(cropData.x);
-            document.getElementById('crop-y').value = Math.round(cropData.y);
-            document.getElementById('crop-w').value = Math.round(cropData.w);
-            document.getElementById('crop-h').value = Math.round(cropData.h);
+        function getCanvasMousePos(e) {
+            const rect = previewCanvas.getBoundingClientRect();
+            const scaleX = previewCanvas.width / rect.width;
+            const scaleY = previewCanvas.height / rect.height;
+
+            const clientX = e.clientX - rect.left;
+            const clientY = e.clientY - rect.top;
+
+            return {
+                x: (clientX * scaleX) + viewBounds.minX,
+                y: (clientY * scaleY) + viewBounds.minY
+            };
         }
 
-        let isDragging = false;
-        let isResizing = false;
-        let currentHandle = null;
-        let startX, startY, startCropX, startCropY, startCropW, startCropH;
+        previewCanvas.addEventListener('mousedown', e => {
+            const pos = getCanvasMousePos(e);
+            dragStartX = pos.x;
+            dragStartY = pos.y;
+            startCrop = { ...cropData };
+            startGif = { ...gifData };
 
-        cropBox.addEventListener('mousedown', e => {
-            e.stopPropagation();
-            startX = e.clientX;
-            startY = e.clientY;
+            const cX = cropData.x - viewBounds.minX;
+            const cY = cropData.y - viewBounds.minY;
+            const handles = getHandlePositions(cX, cY, cropData.w, cropData.h);
 
-            if (e.target.classList.contains('handle')) {
-                isResizing = true;
-                currentHandle = e.target;
-            } else {
-                isDragging = true;
-            }
-
-            startCropX = cropData.x;
-            startCropY = cropData.y;
-            startCropW = cropData.w;
-            startCropH = cropData.h;
-
-            document.addEventListener('mousemove', onMouseMove);
-            document.addEventListener('mouseup', onMouseUp);
-        });
-
-        function onMouseMove(e) {
-            const scale = getScaleRatio();
-            const dx = (e.clientX - startX) / scale;
-            const dy = (e.clientY - startY) / scale;
-
-            if (isDragging) {
-                cropData.x = startCropX + dx;
-                cropData.y = startCropY + dy;
-            } else if (isResizing) {
-                if (currentHandle.classList.contains('br')) {
-                    cropData.w = Math.max(20, startCropW + dx);
-                    cropData.h = Math.max(20, startCropH + dy);
-                } else if (currentHandle.classList.contains('tl')) {
-                    const newW = Math.max(20, startCropW - dx);
-                    const newH = Math.max(20, startCropH - dy);
-                    cropData.x = startCropX + (startCropW - newW);
-                    cropData.y = startCropY + (startCropH - newH);
-                    cropData.w = newW;
-                    cropData.h = newH;
-                } else if (currentHandle.classList.contains('tr')) {
-                    const newH = Math.max(20, startCropH - dy);
-                    cropData.w = Math.max(20, startCropW + dx);
-                    cropData.y = startCropY + (startCropH - newH);
-                    cropData.h = newH;
-                } else if (currentHandle.classList.contains('bl')) {
-                    const newW = Math.max(20, startCropW - dx);
-                    cropData.x = startCropX + (startCropW - newW);
-                    cropData.w = newW;
-                    cropData.h = Math.max(20, startCropH + dy);
+            for (let h of handles) {
+                const dist = Math.hypot(pos.x - viewBounds.minX - h.x, pos.y - viewBounds.minY - h.y);
+                if (dist <= 10) {
+                    isInteracting = true;
+                    dragMode = 'resize-handle';
+                    activeHandle = h.id;
+                    return;
                 }
             }
 
-            syncCropBoxUI();
-            updateInputsFromCropData();
+            if (pos.x >= gifData.x && pos.x <= gifData.x + gifData.w &&
+                pos.y >= gifData.y && pos.y <= gifData.y + gifData.h) {
+                isInteracting = true;
+                dragMode = 'move-gif';
+                return;
+            }
+
+            if (pos.x >= cropData.x && pos.x <= cropData.x + cropData.w &&
+                pos.y >= cropData.y && pos.y <= cropData.y + cropData.h) {
+                isInteracting = true;
+                dragMode = 'move-frame';
+                return;
+            }
+        });
+
+        window.addEventListener('mousemove', e => {
+            if (!isInteracting) return;
+            const pos = getCanvasMousePos(e);
+            const dx = pos.x - dragStartX;
+            const dy = pos.y - dragStartY;
+
+            if (dragMode === 'move-gif') {
+                gifData.x = startGif.x + dx;
+                gifData.y = startGif.y + dy;
+            } else if (dragMode === 'move-frame') {
+                cropData.x = startCrop.x + dx;
+                cropData.y = startCrop.y + dy;
+            } else if (dragMode === 'resize-handle') {
+                const lockRatio = document.getElementById('lock-ratio-check').checked;
+                const ratio = getTargetRatio();
+
+                let newW = startCrop.w;
+                let newH = startCrop.h;
+                let newX = startCrop.x;
+                let newY = startCrop.y;
+
+                if (activeHandle === 'br') {
+                    newW = Math.max(30, startCrop.w + dx);
+                    newH = lockRatio ? newW / ratio : Math.max(30, startCrop.h + dy);
+                } else if (activeHandle === 'bl') {
+                    newW = Math.max(30, startCrop.w - dx);
+                    newX = startCrop.x + (startCrop.w - newW);
+                    newH = lockRatio ? newW / ratio : Math.max(30, startCrop.h + dy);
+                } else if (activeHandle === 'tr') {
+                    newW = Math.max(30, startCrop.w + dx);
+                    newH = lockRatio ? newW / ratio : Math.max(30, startCrop.h - dy);
+                    if (lockRatio) newY = startCrop.y + (startCrop.h - newH);
+                } else if (activeHandle === 'tl') {
+                    newW = Math.max(30, startCrop.w - dx);
+                    newX = startCrop.x + (startCrop.w - newW);
+                    newH = lockRatio ? newW / ratio : Math.max(30, startCrop.h - dy);
+                    if (lockRatio) newY = startCrop.y + (startCrop.h - newH);
+                }
+
+                cropData.w = newW;
+                cropData.h = newH;
+                cropData.x = newX;
+                cropData.y = newY;
+            }
+
+            updateInputs();
+        });
+
+        window.addEventListener('mouseup', () => {
+            isInteracting = false;
+            dragMode = null;
+            activeHandle = null;
+        });
+
+        function updateInputs() {
+            document.getElementById('crop-w').value = Math.round(cropData.w);
+            document.getElementById('crop-h').value = Math.round(cropData.h);
+            document.getElementById('gif-w').value = Math.round(gifData.w);
+            document.getElementById('gif-h').value = Math.round(gifData.h);
         }
 
-        function onMouseUp() {
-            isDragging = false;
-            isResizing = false;
-            document.removeEventListener('mousemove', onMouseMove);
-            document.removeEventListener('mouseup', onMouseUp);
-        }
+        document.getElementById('crop-w').addEventListener('input', e => {
+            cropData.w = parseFloat(e.target.value) || 10;
+            if (document.getElementById('lock-ratio-check').checked) {
+                cropData.h = cropData.w / getTargetRatio();
+                document.getElementById('crop-h').value = Math.round(cropData.h);
+            }
+        });
 
-        ['crop-x', 'crop-y', 'crop-w', 'crop-h'].forEach(id => {
-            document.getElementById(id).addEventListener('input', () => {
-                cropData.x = parseFloat(document.getElementById('crop-x').value) || 0;
-                cropData.y = parseFloat(document.getElementById('crop-y').value) || 0;
-                cropData.w = parseFloat(document.getElementById('crop-w').value) || originalWidth;
-                cropData.h = parseFloat(document.getElementById('crop-h').value) || originalHeight;
-                syncCropBoxUI();
-            });
+        document.getElementById('crop-h').addEventListener('input', e => {
+            cropData.h = parseFloat(e.target.value) || 10;
+            if (document.getElementById('lock-ratio-check').checked) {
+                cropData.w = cropData.h * getTargetRatio();
+                document.getElementById('crop-w').value = Math.round(cropData.w);
+            }
+        });
+
+        document.getElementById('gif-w').addEventListener('input', e => {
+            const oldW = gifData.w;
+            gifData.w = parseFloat(e.target.value) || 10;
+            gifData.h = gifData.h * (gifData.w / oldW);
+            document.getElementById('gif-h').value = Math.round(gifData.h);
+        });
+
+        document.getElementById('gif-h').addEventListener('input', e => {
+            const oldH = gifData.h;
+            gifData.h = parseFloat(e.target.value) || 10;
+            gifData.w = gifData.w * (gifData.h / oldH);
+            document.getElementById('gif-w').value = Math.round(gifData.w);
+        });
+
+        document.getElementById('center-gif-btn').addEventListener('click', () => {
+            gifData.x = cropData.x + (cropData.w - gifData.w) / 2;
+            gifData.y = cropData.y + (cropData.h - gifData.h) / 2;
         });
 
         document.getElementById('fit-1200-btn').addEventListener('click', () => {
@@ -591,10 +694,10 @@
             const scaleX = targetW / cropData.w;
             const scaleY = targetH / cropData.h;
 
-            const destX = (0 - cropData.x) * scaleX;
-            const destY = (0 - cropData.y) * scaleY;
-            const destW = originalWidth * scaleX;
-            const destH = originalHeight * scaleY;
+            const renderGifX = (gifData.x - cropData.x) * scaleX;
+            const renderGifY = (gifData.y - cropData.y) * scaleY;
+            const renderGifW = gifData.w * scaleX;
+            const renderGifH = gifData.h * scaleY;
 
             const processedCanvases = parsedFrames.map(frameObj => {
                 const c = document.createElement('canvas');
@@ -605,17 +708,20 @@
                 cCtx.fillStyle = '#000000';
                 cCtx.fillRect(0, 0, targetW, targetH);
 
-                cCtx.drawImage(
-                    frameObj.canvas,
-                    0, 0, originalWidth, originalHeight,
-                    destX, destY, destW, destH
-                );
+                cCtx.save();
+                cCtx.beginPath();
+                cCtx.rect(0, 0, targetW, targetH);
+                cCtx.clip();
+
+                cCtx.drawImage(frameObj.canvas, renderGifX, renderGifY, renderGifW, renderGifH);
 
                 if (text) {
                     cCtx.font = `${textSize}px Arial`;
                     cCtx.fillStyle = textColor;
-                    cCtx.fillText(text, textX, textY);
+                    cCtx.fillText(text, textX * scaleX, textY * scaleY);
                 }
+                cCtx.restore();
+
                 return { canvas: c, delay: frameObj.delay };
             });
 
@@ -634,8 +740,6 @@
 
             } else if (format === 'apng') {
                 try {
-                    if (!window.UPNG) throw new Error("UPNG kütüphanesi yüklenemedi.");
-
                     const imgs = [];
                     const delays = [];
                     processedCanvases.forEach(item => {
@@ -655,7 +759,7 @@
 
         function downloadFile(blob, filename) {
             const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
+            const a = document.append ? document.createElement('a') : document.createElement('a');
             a.href = url;
             a.download = filename;
             a.click();
@@ -671,8 +775,6 @@
         function hideStatus() {
             statusBar.style.display = 'none';
         }
-
-        window.addEventListener('resize', syncCropBoxUI);
     </script>
 </body>
 </html>
