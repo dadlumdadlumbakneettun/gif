@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GIF Düzenleme Aracı</title>
+    <!-- Omggif: Güvenilir ve bağımsız GIF çözücü -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/omggif/1.0.10/omggif.min.js"></script>
+    <!-- Gif.js: GIF oluşturan kütüphane -->
+    <script src="https://cdn.jsdelivr.net/npm/gif.js@0.2.0/dist/gif.js"></script>
+    <style>
+        :root {
+            --bg-color: #121214;
+            --panel-bg: #1e1e24;
+            --accent-color: #6366f1;
+            --accent-hover: #4f46e5;
+            --text-color: #f3f4f6;
+            --border-color: #374151;
+        }
+
+        body {
+            margin: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .sidebar {
+            width: 320px;
+            background-color: var(--panel-bg);
+            border-right: 1px solid var(--border-color);
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            overflow-y: auto;
+        }
+
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            position: relative;
+        }
+
+        h2 {
+            margin: 0 0 10px 0;
+            font-size: 1.1rem;
+            color: #fff;
+        }
+
+        .section {
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 4px;
+            font-size: 0.8rem;
+            color: #9ca3af;
+        }
+
+        input[type="text"], input[type="number"], select {
+            width: 100%;
+            padding: 8px;
+            background: #111827;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            color: #fff;
+            box-sizing: border-box;
+            margin-bottom: 8px;
+        }
+
+        .row {
+            display: flex;
+            gap: 10px;
+        }
+
+        .row > div {
+            flex: 1;
+        }
+
+        button, .file-upload-btn {
+            background-color: var(--accent-color);
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            width: 100%;
+            text-align: center;
+            box-sizing: border-box;
+            transition: background 0.2s;
+            display: block;
+        }
+
+        button:hover, .file-upload-btn:hover {
+            background-color: var(--accent-hover);
+        }
+
+        input[type="file"] {
+            display: none;
+        }
+
+        #drop-zone {
+            width: 100%;
+            height: 100%;
+            max-width: 800px;
+            max-height: 80vh;
+            border: 2px dashed var(--border-color);
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            background: #000;
+            position: relative;
+            transition: border-color 0.2s, background-color 0.2s;
+        }
+
+        #drop-zone.dragover {
+            border-color: var(--accent-color);
+            background-color: rgba(99, 102, 241, 0.1);
+        }
+
+        #drop-instructions {
+            position: absolute;
+            pointer-events: none;
+            text-align: center;
+            color: #6b7280;
+        }
+
+        canvas {
+            max-width: 100%;
+            max-height: 80vh;
+            display: none;
+        }
+
+        #status {
+            position: absolute;
+            bottom: 20px;
+            background: rgba(0,0,0,0.85);
+            border: 1px solid var(--border-color);
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            display: none;
+            z-index: 10;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="sidebar">
+        <h2>GIF Düzenleyici</h2>
+        
+        <div class="section">
+            <label for="file-input" class="file-upload-btn">GIF Seç</label>
+            <input type="file" id="file-input" accept="image/gif">
+        </div>
+
+        <div class="section">
+            <h2>Yeniden Boyutlandır</h2>
+            <div class="row">
+                <div>
+                    <label>Genişlik (px)</label>
+                    <input type="number" id="width-input">
+                </div>
+                <div>
+                    <label>Yükseklik (px)</label>
+                    <input type="number" id="height-input">
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>Kırpma (Crop)</h2>
+            <div class="row">
+                <div>
+                    <label>X Pozisyonu</label>
+                    <input type="number" id="crop-x" value="0">
+                </div>
+                <div>
+                    <label>Y Pozisyonu</label>
+                    <input type="number" id="crop-y" value="0">
+                </div>
+            </div>
+            <div class="row">
+                <div>
+                    <label>Genişlik</label>
+                    <input type="number" id="crop-w">
+                </div>
+                <div>
+                    <label>Yükseklik</label>
+                    <input type="number" id="crop-h">
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>Yazı Ekle</h2>
+            <label>Metin</label>
+            <input type="text" id="text-input" placeholder="Metin yazın...">
+            <div class="row">
+                <div>
+                    <label>Boyut (px)</label>
+                    <input type="number" id="text-size" value="28">
+                </div>
+                <div>
+                    <label>Renk</label>
+                    <input type="text" id="text-color" value="#ffffff">
+                </div>
+            </div>
+            <div class="row">
+                <div>
+                    <label>Metin X</label>
+                    <input type="number" id="text-x" value="20">
+                </div>
+                <div>
+                    <label>Metin Y</label>
+                    <input type="number" id="text-y" value="50">
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>Dışa Aktar</h2>
+            <label>Format</label>
+            <select id="export-format">
+                <option value="gif">GIF</option>
+                <option value="apng">APNG (Hareketli PNG)</option>
+            </select>
+            <button id="export-btn">İşle ve İndir</button>
+        </div>
+    </div>
+
+    <div class="main-content">
+        <div id="drop-zone">
+            <div id="drop-instructions">
+                <p style="font-size: 1.2rem; margin-bottom: 5px;">GIF dosyasını buraya sürükleyin</p>
+                <p style="font-size: 0.85rem;">veya sol panelden dosya seçin</p>
+            </div>
+            <canvas id="preview-canvas"></canvas>
+        </div>
+        <div id="status">İşleniyor...</div>
+    </div>
+
+    <script>
+        const fileInput = document.getElementById('file-input');
+        const dropZone = document.getElementById('drop-zone');
+        const dropInstructions = document.getElementById('drop-instructions');
+        const previewCanvas = document.getElementById('preview-canvas');
+        const ctx = previewCanvas.getContext('2d');
+        const statusEl = document.getElementById('status');
+
+        let parsedFrames = [];
+        let originalWidth = 0;
+        let originalHeight = 0;
+        let animationFrameId = null;
+        let currentFrameIndex = 0;
+        let workerBlobUrl = null;
+
+        // Worker CORS Engelini Aşmak İçin Worker Scriptini Blob Olarak Hazırla
+        fetch('https://cdn.jsdelivr.net/npm/gif.js@0.2.0/dist/gif.worker.js')
+            .then(res => res.text())
+            .then(code => {
+                const blob = new Blob([code], { type: 'application/javascript' });
+                workerBlobUrl = URL.createObjectURL(blob);
+            })
+            .catch(() => console.warn("Worker yerel olarak yüklenecektir."));
+
+        // Drag & Drop Olayları
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, preventDefaults, false);
+            document.body.addEventListener(eventName, preventDefaults, false);
+        });
+
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropZone.addEventListener(eventName, () => dropZone.classList.add('dragover'), false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, () => dropZone.classList.remove('dragover'), false);
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                processGifFile(files[0]);
+            }
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                processGifFile(e.target.files[0]);
+            }
+        });
+
+        function processGifFile(file) {
+            showStatus('GIF İşleniyor...');
+            const reader = new FileReader();
+
+            reader.onload = function (e) {
+                try {
+                    const buffer = new Uint8Array(e.target.result);
+                    const gifReader = new omggif.GifReader(buffer);
+
+                    originalWidth = gifReader.width;
+                    originalHeight = gifReader.height;
+
+                    document.getElementById('width-input').value = originalWidth;
+                    document.getElementById('height-input').value = originalHeight;
+                    document.getElementById('crop-w').value = originalWidth;
+                    document.getElementById('crop-h').value = originalHeight;
+
+                    parsedFrames = [];
+                    const numFrames = gifReader.numFrames();
+
+                    // Ana Tuval (Tuval birikimi için)
+                    const accCanvas = document.createElement('canvas');
+                    accCanvas.width = originalWidth;
+                    accCanvas.height = originalHeight;
+                    const accCtx = accCanvas.getContext('2d');
+
+                    for (let i = 0; i < numFrames; i++) {
+                        const frameInfo = gifReader.frameInfo(i);
+                        const frameImageData = accCtx.createImageData(originalWidth, originalHeight);
+
+                        gifReader.decodeAndBlitFrameRGBA(i, frameImageData.data);
+
+                        // Kareyi mevcut çizime harmanla
+                        const tempCanvas = document.createElement('canvas');
+                        tempCanvas.width = originalWidth;
+                        tempCanvas.height = originalHeight;
+                        const tempCtx = tempCanvas.getContext('2d');
+                        tempCtx.putImageData(frameImageData, 0, 0);
+
+                        accCtx.drawImage(tempCanvas, 0, 0);
+
+                        // İşlenmiş kareyi kaydet
+                        const frameCanvas = document.createElement('canvas');
+                        frameCanvas.width = originalWidth;
+                        frameCanvas.height = originalHeight;
+                        frameCanvas.getContext('2d').drawImage(accCanvas, 0, 0);
+
+                        parsedFrames.push({
+                            canvas: frameCanvas,
+                            delay: (frameInfo.delay || 10) * 10 // cs -> ms dönüşümü
+                        });
+                    }
+
+                    dropInstructions.style.display = 'none';
+                    previewCanvas.style.display = 'block';
+                    hideStatus();
+                    startPreview();
+
+                } catch (err) {
+                    alert('Lütfen geçerli bir GIF dosyası yükleyin.');
+                    hideStatus();
+                }
+            };
+
+            reader.readAsArrayBuffer(file);
+        }
+
+        function startPreview() {
+            if (animationFrameId) cancelAnimationFrame(animationFrameId);
+            let lastTime = performance.now();
+            currentFrameIndex = 0;
+
+            function render(now) {
+                if (parsedFrames.length === 0) return;
+
+                const cropX = parseInt(document.getElementById('crop-x').value) || 0;
+                const cropY = parseInt(document.getElementById('crop-y').value) || 0;
+                const cropW = parseInt(document.getElementById('crop-w').value) || originalWidth;
+                const cropH = parseInt(document.getElementById('crop-h').value) || originalHeight;
+
+                previewCanvas.width = cropW;
+                previewCanvas.height = cropH;
+
+                const currentFrame = parsedFrames[currentFrameIndex];
+                const delay = currentFrame.delay > 0 ? currentFrame.delay : 100;
+
+                if (now - lastTime >= delay) {
+                    currentFrameIndex = (currentFrameIndex + 1) % parsedFrames.length;
+                    lastTime = now;
+                }
+
+                ctx.clearRect(0, 0, cropW, cropH);
+                ctx.drawImage(currentFrame.canvas, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
+
+                const text = document.getElementById('text-input').value;
+                if (text) {
+                    const textSize = document.getElementById('text-size').value;
+                    const textColor = document.getElementById('text-color').value;
+                    const textX = parseInt(document.getElementById('text-x').value) || 0;
+                    const textY = parseInt(document.getElementById('text-y').value) || 0;
+
+                    ctx.font = `${textSize}px Arial`;
+                    ctx.fillStyle = textColor;
+                    ctx.fillText(text, textX, textY);
+                }
+
+                animationFrameId = requestAnimationFrame(render);
+            }
+
+            animationFrameId = requestAnimationFrame(render);
+        }
+
+        document.getElementById('export-btn').addEventListener('click', () => {
+            if (parsedFrames.length === 0) return;
+
+            showStatus('Dışa aktarılıyor...');
+            const targetW = parseInt(document.getElementById('width-input').value) || originalWidth;
+            const targetH = parseInt(document.getElementById('height-input').value) || originalHeight;
+            const cropX = parseInt(document.getElementById('crop-x').value) || 0;
+            const cropY = parseInt(document.getElementById('crop-y').value) || 0;
+            const cropW = parseInt(document.getElementById('crop-w').value) || originalWidth;
+            const cropH = parseInt(document.getElementById('crop-h').value) || originalHeight;
+
+            const text = document.getElementById('text-input').value;
+            const textSize = document.getElementById('text-size').value;
+            const textColor = document.getElementById('text-color').value;
+            const textX = parseInt(document.getElementById('text-x').value) || 0;
+            const textY = parseInt(document.getElementById('text-y').value) || 0;
+
+            const gifOptions = {
+                workers: 2,
+                quality: 10,
+                width: targetW,
+                height: targetH
+            };
+
+            if (workerBlobUrl) {
+                gifOptions.workerScript = workerBlobUrl;
+            }
+
+            const gif = new GIF(gifOptions);
+
+            parsedFrames.forEach(frameObj => {
+                const c = document.createElement('canvas');
+                c.width = targetW;
+                c.height = targetH;
+                const cCtx = c.getContext('2d');
+
+                cCtx.drawImage(frameObj.canvas, cropX, cropY, cropW, cropH, 0, 0, targetW, targetH);
+
+                if (text) {
+                    cCtx.font = `${textSize}px Arial`;
+                    cCtx.fillStyle = textColor;
+                    cCtx.fillText(text, textX, textY);
+                }
+
+                gif.addFrame(c, { delay: frameObj.delay });
+            });
+
+            gif.on('finished', (blob) => {
+                const format = document.getElementById('export-format').value;
+                const ext = format === 'apng' ? 'png' : 'gif';
+                downloadFile(blob, `export.${ext}`);
+                hideStatus();
+            });
+
+            gif.render();
+        });
+
+        function downloadFile(blob, filename) {
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function showStatus(text) {
+            statusEl.innerText = text;
+            statusEl.style.display = 'block';
+        }
+
+        function hideStatus() {
+            statusEl.style.display = 'none';
+        }
+    </script>
+</body>
+</html>
