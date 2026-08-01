@@ -3,10 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GIF Düzenleme Aracı</title>
-    <!-- Omggif: Güvenilir ve bağımsız GIF çözücü -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/omggif/1.0.10/omggif.min.js"></script>
-    <!-- Gif.js: GIF oluşturan kütüphane -->
+    <title>GIF Düzenleyici</title>
+    <script src="https://cdn.jsdelivr.net/npm/omggif@1.0.10/omggif.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/gif.js@0.2.0/dist/gif.js"></script>
     <style>
         :root {
@@ -16,11 +14,12 @@
             --accent-hover: #4f46e5;
             --text-color: #f3f4f6;
             --border-color: #374151;
+            --error-color: #ef4444;
         }
 
         body {
             margin: 0;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: system-ui, -apple-system, sans-serif;
             background-color: var(--bg-color);
             color: var(--text-color);
             display: flex;
@@ -124,7 +123,6 @@
             overflow: hidden;
             background: #000;
             position: relative;
-            transition: border-color 0.2s, background-color 0.2s;
         }
 
         #drop-zone.dragover {
@@ -145,16 +143,23 @@
             display: none;
         }
 
-        #status {
+        #status-bar {
             position: absolute;
             bottom: 20px;
-            background: rgba(0,0,0,0.85);
+            background: rgba(0,0,0,0.9);
             border: 1px solid var(--border-color);
-            padding: 8px 16px;
+            padding: 10px 20px;
             border-radius: 20px;
-            font-size: 0.9rem;
+            font-size: 0.85rem;
             display: none;
             z-index: 10;
+            max-width: 80%;
+            word-break: break-word;
+        }
+
+        #status-bar.error {
+            border-color: var(--error-color);
+            color: #fca5a5;
         }
     </style>
 </head>
@@ -164,7 +169,7 @@
         <h2>GIF Düzenleyici</h2>
         
         <div class="section">
-            <label for="file-input" class="file-upload-btn">GIF Seç</label>
+            <label for="file-input" class="file-upload-btn">GIF Dosyası Seç</label>
             <input type="file" id="file-input" accept="image/gif">
         </div>
 
@@ -209,7 +214,7 @@
         <div class="section">
             <h2>Yazı Ekle</h2>
             <label>Metin</label>
-            <input type="text" id="text-input" placeholder="Metin yazın...">
+            <input type="text" id="text-input" placeholder="Yazı yazın...">
             <div class="row">
                 <div>
                     <label>Boyut (px)</label>
@@ -237,7 +242,7 @@
             <label>Format</label>
             <select id="export-format">
                 <option value="gif">GIF</option>
-                <option value="apng">APNG (Hareketli PNG)</option>
+                <option value="apng">APNG (PNG)</option>
             </select>
             <button id="export-btn">İşle ve İndir</button>
         </div>
@@ -251,7 +256,7 @@
             </div>
             <canvas id="preview-canvas"></canvas>
         </div>
-        <div id="status">İşleniyor...</div>
+        <div id="status-bar"></div>
     </div>
 
     <script>
@@ -260,65 +265,53 @@
         const dropInstructions = document.getElementById('drop-instructions');
         const previewCanvas = document.getElementById('preview-canvas');
         const ctx = previewCanvas.getContext('2d');
-        const statusEl = document.getElementById('status');
+        const statusBar = document.getElementById('status-bar');
 
         let parsedFrames = [];
         let originalWidth = 0;
         let originalHeight = 0;
         let animationFrameId = null;
         let currentFrameIndex = 0;
-        let workerBlobUrl = null;
 
-        // Worker CORS Engelini Aşmak İçin Worker Scriptini Blob Olarak Hazırla
-        fetch('https://cdn.jsdelivr.net/npm/gif.js@0.2.0/dist/gif.worker.js')
-            .then(res => res.text())
-            .then(code => {
-                const blob = new Blob([code], { type: 'application/javascript' });
-                workerBlobUrl = URL.createObjectURL(blob);
-            })
-            .catch(() => console.warn("Worker yerel olarak yüklenecektir."));
-
-        // Drag & Drop Olayları
-        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-            dropZone.addEventListener(eventName, preventDefaults, false);
-            document.body.addEventListener(eventName, preventDefaults, false);
+        // Sürükle ve Bırak Olay Yönetimi
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(evt => {
+            dropZone.addEventListener(evt, e => { e.preventDefault(); e.stopPropagation(); });
+            document.body.addEventListener(evt, e => { e.preventDefault(); e.stopPropagation(); });
         });
 
-        function preventDefaults(e) {
-            e.preventDefault();
-            e.stopPropagation();
-        }
-
-        ['dragenter', 'dragover'].forEach(eventName => {
-            dropZone.addEventListener(eventName, () => dropZone.classList.add('dragover'), false);
+        ['dragenter', 'dragover'].forEach(evt => {
+            dropZone.addEventListener(evt, () => dropZone.classList.add('dragover'));
         });
 
-        ['dragleave', 'drop'].forEach(eventName => {
-            dropZone.addEventListener(eventName, () => dropZone.classList.remove('dragover'), false);
+        ['dragleave', 'drop'].forEach(evt => {
+            dropZone.addEventListener(evt, () => dropZone.classList.remove('dragover'));
         });
 
-        dropZone.addEventListener('drop', (e) => {
+        dropZone.addEventListener('drop', e => {
             const files = e.dataTransfer.files;
-            if (files.length > 0) {
-                processGifFile(files[0]);
-            }
+            if (files.length > 0) processGifFile(files[0]);
         });
 
-        fileInput.addEventListener('change', (e) => {
-            if (e.target.files.length > 0) {
-                processGifFile(e.target.files[0]);
-            }
+        fileInput.addEventListener('change', e => {
+            if (e.target.files.length > 0) processGifFile(e.target.files[0]);
         });
 
         function processGifFile(file) {
-            showStatus('GIF İşleniyor...');
+            showStatus('GIF çözümleniyor...', false);
             const reader = new FileReader();
 
             reader.onload = function (e) {
                 try {
-                    const buffer = new Uint8Array(e.target.result);
-                    const gifReader = new omggif.GifReader(buffer);
+                    const arrayBuffer = e.target.result;
+                    const uint8Array = new Uint8Array(arrayBuffer);
 
+                    // Omggif Nesne Kontrolü
+                    const GifReaderClass = window.GifReader || (window.omggif && window.omggif.GifReader);
+                    if (!GifReaderClass) {
+                        throw new Error("GIF çözücü kütüphane yüklenemedi. İnternet bağlantınızı kontrol edin.");
+                    }
+
+                    const gifReader = new GifReaderClass(uint8Array);
                     originalWidth = gifReader.width;
                     originalHeight = gifReader.height;
 
@@ -330,36 +323,36 @@
                     parsedFrames = [];
                     const numFrames = gifReader.numFrames();
 
-                    // Ana Tuval (Tuval birikimi için)
-                    const accCanvas = document.createElement('canvas');
-                    accCanvas.width = originalWidth;
-                    accCanvas.height = originalHeight;
-                    const accCtx = accCanvas.getContext('2d');
+                    const canvas = document.createElement('canvas');
+                    canvas.width = originalWidth;
+                    canvas.height = originalHeight;
+                    const canvasCtx = canvas.getContext('2d');
 
                     for (let i = 0; i < numFrames; i++) {
                         const frameInfo = gifReader.frameInfo(i);
-                        const frameImageData = accCtx.createImageData(originalWidth, originalHeight);
+                        const imageData = canvasCtx.createImageData(originalWidth, originalHeight);
 
-                        gifReader.decodeAndBlitFrameRGBA(i, frameImageData.data);
+                        gifReader.decodeAndBlitFrameRGBA(i, imageData.data);
 
-                        // Kareyi mevcut çizime harmanla
-                        const tempCanvas = document.createElement('canvas');
-                        tempCanvas.width = originalWidth;
-                        tempCanvas.height = originalHeight;
-                        const tempCtx = tempCanvas.getContext('2d');
-                        tempCtx.putImageData(frameImageData, 0, 0);
-
-                        accCtx.drawImage(tempCanvas, 0, 0);
-
-                        // İşlenmiş kareyi kaydet
                         const frameCanvas = document.createElement('canvas');
                         frameCanvas.width = originalWidth;
                         frameCanvas.height = originalHeight;
-                        frameCanvas.getContext('2d').drawImage(accCanvas, 0, 0);
+                        const frameCtx = frameCanvas.getContext('2d');
+
+                        if (i > 0 && frameInfo.disposal !== 2 && frameInfo.disposal !== 3) {
+                            frameCtx.drawImage(parsedFrames[i - 1].canvas, 0, 0);
+                        }
+
+                        const tempCanvas = document.createElement('canvas');
+                        tempCanvas.width = originalWidth;
+                        tempCanvas.height = originalHeight;
+                        tempCanvas.getContext('2d').putImageData(imageData, 0, 0);
+
+                        frameCtx.drawImage(tempCanvas, 0, 0);
 
                         parsedFrames.push({
                             canvas: frameCanvas,
-                            delay: (frameInfo.delay || 10) * 10 // cs -> ms dönüşümü
+                            delay: (frameInfo.delay || 10) * 10
                         });
                     }
 
@@ -369,9 +362,12 @@
                     startPreview();
 
                 } catch (err) {
-                    alert('Lütfen geçerli bir GIF dosyası yükleyin.');
-                    hideStatus();
+                    showStatus('Hata: ' + err.message, true);
                 }
+            };
+
+            reader.onerror = function () {
+                showStatus('Dosya okuma hatası oluştu.', true);
             };
 
             reader.readAsArrayBuffer(file);
@@ -423,9 +419,12 @@
         }
 
         document.getElementById('export-btn').addEventListener('click', () => {
-            if (parsedFrames.length === 0) return;
+            if (parsedFrames.length === 0) {
+                showStatus('Lütfen önce bir GIF yükleyin.', true);
+                return;
+            }
 
-            showStatus('Dışa aktarılıyor...');
+            showStatus('Dışa aktarılıyor...', false);
             const targetW = parseInt(document.getElementById('width-input').value) || originalWidth;
             const targetH = parseInt(document.getElementById('height-input').value) || originalHeight;
             const cropX = parseInt(document.getElementById('crop-x').value) || 0;
@@ -439,44 +438,42 @@
             const textX = parseInt(document.getElementById('text-x').value) || 0;
             const textY = parseInt(document.getElementById('text-y').value) || 0;
 
-            const gifOptions = {
-                workers: 2,
-                quality: 10,
-                width: targetW,
-                height: targetH
-            };
+            try {
+                const gif = new GIF({
+                    workers: 1,
+                    quality: 10,
+                    width: targetW,
+                    height: targetH
+                });
 
-            if (workerBlobUrl) {
-                gifOptions.workerScript = workerBlobUrl;
+                parsedFrames.forEach(frameObj => {
+                    const c = document.createElement('canvas');
+                    c.width = targetW;
+                    c.height = targetH;
+                    const cCtx = c.getContext('2d');
+
+                    cCtx.drawImage(frameObj.canvas, cropX, cropY, cropW, cropH, 0, 0, targetW, targetH);
+
+                    if (text) {
+                        cCtx.font = `${textSize}px Arial`;
+                        cCtx.fillStyle = textColor;
+                        cCtx.fillText(text, textX, textY);
+                    }
+
+                    gif.addFrame(c, { delay: frameObj.delay });
+                });
+
+                gif.on('finished', blob => {
+                    const format = document.getElementById('export-format').value;
+                    const ext = format === 'apng' ? 'png' : 'gif';
+                    downloadFile(blob, `edited.${ext}`);
+                    hideStatus();
+                });
+
+                gif.render();
+            } catch (e) {
+                showStatus('Dışa aktarma hatası: ' + e.message, true);
             }
-
-            const gif = new GIF(gifOptions);
-
-            parsedFrames.forEach(frameObj => {
-                const c = document.createElement('canvas');
-                c.width = targetW;
-                c.height = targetH;
-                const cCtx = c.getContext('2d');
-
-                cCtx.drawImage(frameObj.canvas, cropX, cropY, cropW, cropH, 0, 0, targetW, targetH);
-
-                if (text) {
-                    cCtx.font = `${textSize}px Arial`;
-                    cCtx.fillStyle = textColor;
-                    cCtx.fillText(text, textX, textY);
-                }
-
-                gif.addFrame(c, { delay: frameObj.delay });
-            });
-
-            gif.on('finished', (blob) => {
-                const format = document.getElementById('export-format').value;
-                const ext = format === 'apng' ? 'png' : 'gif';
-                downloadFile(blob, `export.${ext}`);
-                hideStatus();
-            });
-
-            gif.render();
         });
 
         function downloadFile(blob, filename) {
@@ -488,13 +485,18 @@
             URL.revokeObjectURL(url);
         }
 
-        function showStatus(text) {
-            statusEl.innerText = text;
-            statusEl.style.display = 'block';
+        function showStatus(text, isError) {
+            statusBar.innerText = text;
+            statusBar.style.display = 'block';
+            if (isError) {
+                statusBar.classList.add('error');
+            } else {
+                statusBar.classList.remove('error');
+            }
         }
 
         function hideStatus() {
-            statusEl.style.display = 'none';
+            statusBar.style.display = 'none';
         }
     </script>
 </body>
