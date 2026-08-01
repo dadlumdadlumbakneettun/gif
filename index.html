@@ -6,6 +6,7 @@
     <title>GIF Düzenleyici</title>
     <script src="https://cdn.jsdelivr.net/npm/omggif@1.0.10/omggif.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/gif.js@0.2.0/dist/gif.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/upng-js@2.1.0/UPNG.min.js"></script>
     <style>
         :root {
             --bg-color: #121214;
@@ -46,6 +47,7 @@
             justify-content: center;
             padding: 20px;
             position: relative;
+            user-select: none;
         }
 
         h2 {
@@ -109,39 +111,52 @@
             display: none;
         }
 
-        #drop-zone {
-            width: 100%;
-            height: 100%;
-            max-width: 800px;
+        #editor-container {
+            position: relative;
+            display: inline-block;
+            max-width: 100%;
             max-height: 80vh;
             border: 2px dashed var(--border-color);
             border-radius: 8px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
             overflow: hidden;
             background: #000;
-            position: relative;
-        }
-
-        #drop-zone.dragover {
-            border-color: var(--accent-color);
-            background-color: rgba(99, 102, 241, 0.1);
         }
 
         #drop-instructions {
-            position: absolute;
-            pointer-events: none;
+            padding: 60px 40px;
             text-align: center;
             color: #6b7280;
         }
 
         canvas {
+            display: block;
             max-width: 100%;
             max-height: 80vh;
+        }
+
+        /* İnteraktif Kırpma Kutusu */
+        #crop-box {
+            position: absolute;
+            border: 2px dashed #6366f1;
+            background: rgba(99, 102, 241, 0.15);
+            box-sizing: border-box;
+            cursor: move;
             display: none;
         }
+
+        .handle {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            background: #ffffff;
+            border: 1px solid #6366f1;
+            border-radius: 50%;
+        }
+
+        .handle.tl { top: -5px; left: -5px; cursor: nwse-resize; }
+        .handle.tr { top: -5px; right: -5px; cursor: nesw-resize; }
+        .handle.bl { bottom: -5px; left: -5px; cursor: nesw-resize; }
+        .handle.br { bottom: -5px; right: -5px; cursor: nwse-resize; }
 
         #status-bar {
             position: absolute;
@@ -153,8 +168,6 @@
             font-size: 0.85rem;
             display: none;
             z-index: 10;
-            max-width: 80%;
-            word-break: break-word;
         }
 
         #status-bar.error {
@@ -169,33 +182,21 @@
         <h2>GIF Düzenleyici</h2>
         
         <div class="section">
-            <label for="file-input" class="file-upload-btn">GIF Dosyası Seç</label>
+            <label for="file-input" class="file-upload-btn">GIF Seç</label>
             <input type="file" id="file-input" accept="image/gif">
         </div>
 
         <div class="section">
-            <h2>Yeniden Boyutlandır</h2>
+            <h2>Kırpma Ayarları</h2>
+            <p style="font-size: 0.75rem; color: #9ca3af; margin-top: 0;">Görsel üzerindeki mavi kutuyu fare ile sürükleyip boyutlandırabilirsiniz.</p>
+            <button id="reset-crop-btn" style="background: #374151; margin-bottom: 10px;">Kırpmayı Sıfırla</button>
             <div class="row">
                 <div>
-                    <label>Genişlik (px)</label>
-                    <input type="number" id="width-input">
-                </div>
-                <div>
-                    <label>Yükseklik (px)</label>
-                    <input type="number" id="height-input">
-                </div>
-            </div>
-        </div>
-
-        <div class="section">
-            <h2>Kırpma (Crop)</h2>
-            <div class="row">
-                <div>
-                    <label>X Pozisyonu</label>
+                    <label>Sol (X)</label>
                     <input type="number" id="crop-x" value="0">
                 </div>
                 <div>
-                    <label>Y Pozisyonu</label>
+                    <label>Üst (Y)</label>
                     <input type="number" id="crop-y" value="0">
                 </div>
             </div>
@@ -207,6 +208,20 @@
                 <div>
                     <label>Yükseklik</label>
                     <input type="number" id="crop-h">
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>Çıktı Boyutu</h2>
+            <div class="row">
+                <div>
+                    <label>Genişlik (px)</label>
+                    <input type="number" id="width-input">
+                </div>
+                <div>
+                    <label>Yükseklik (px)</label>
+                    <input type="number" id="height-input">
                 </div>
             </div>
         </div>
@@ -242,28 +257,35 @@
             <label>Format</label>
             <select id="export-format">
                 <option value="gif">GIF</option>
-                <option value="apng">APNG (PNG)</option>
+                <option value="apng">APNG (Hareketli PNG)</option>
             </select>
             <button id="export-btn">İşle ve İndir</button>
         </div>
     </div>
 
     <div class="main-content">
-        <div id="drop-zone">
+        <div id="editor-container">
             <div id="drop-instructions">
                 <p style="font-size: 1.2rem; margin-bottom: 5px;">GIF dosyasını buraya sürükleyin</p>
                 <p style="font-size: 0.85rem;">veya sol panelden dosya seçin</p>
             </div>
             <canvas id="preview-canvas"></canvas>
+            <div id="crop-box">
+                <div class="handle tl"></div>
+                <div class="handle tr"></div>
+                <div class="handle bl"></div>
+                <div class="handle br"></div>
+            </div>
         </div>
         <div id="status-bar"></div>
     </div>
 
     <script>
         const fileInput = document.getElementById('file-input');
-        const dropZone = document.getElementById('drop-zone');
+        const editorContainer = document.getElementById('editor-container');
         const dropInstructions = document.getElementById('drop-instructions');
         const previewCanvas = document.getElementById('preview-canvas');
+        const cropBox = document.getElementById('crop-box');
         const ctx = previewCanvas.getContext('2d');
         const statusBar = document.getElementById('status-bar');
 
@@ -272,24 +294,28 @@
         let originalHeight = 0;
         let animationFrameId = null;
         let currentFrameIndex = 0;
+        let workerBlobUrl = null;
 
-        // Sürükle ve Bırak Olay Yönetimi
+        // Görsel üzerindeki kırpma parametreleri (Orijinal piksel ölçeğinde)
+        let cropData = { x: 0, y: 0, w: 0, h: 0 };
+
+        async function initWorker() {
+            try {
+                const res = await fetch('https://cdn.jsdelivr.net/npm/gif.js@0.2.0/dist/gif.worker.js');
+                const text = await res.text();
+                workerBlobUrl = URL.createObjectURL(new Blob([text], { type: 'application/javascript' }));
+            } catch (err) {}
+        }
+        initWorker();
+
+        // Drag & Drop
         ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(evt => {
-            dropZone.addEventListener(evt, e => { e.preventDefault(); e.stopPropagation(); });
+            editorContainer.addEventListener(evt, e => { e.preventDefault(); e.stopPropagation(); });
             document.body.addEventListener(evt, e => { e.preventDefault(); e.stopPropagation(); });
         });
 
-        ['dragenter', 'dragover'].forEach(evt => {
-            dropZone.addEventListener(evt, () => dropZone.classList.add('dragover'));
-        });
-
-        ['dragleave', 'drop'].forEach(evt => {
-            dropZone.addEventListener(evt, () => dropZone.classList.remove('dragover'));
-        });
-
-        dropZone.addEventListener('drop', e => {
-            const files = e.dataTransfer.files;
-            if (files.length > 0) processGifFile(files[0]);
+        editorContainer.addEventListener('drop', e => {
+            if (e.dataTransfer.files.length > 0) processGifFile(e.dataTransfer.files[0]);
         });
 
         fileInput.addEventListener('change', e => {
@@ -302,23 +328,15 @@
 
             reader.onload = function (e) {
                 try {
-                    const arrayBuffer = e.target.result;
-                    const uint8Array = new Uint8Array(arrayBuffer);
-
-                    // Omggif Nesne Kontrolü
+                    const uint8Array = new Uint8Array(e.target.result);
                     const GifReaderClass = window.GifReader || (window.omggif && window.omggif.GifReader);
-                    if (!GifReaderClass) {
-                        throw new Error("GIF çözücü kütüphane yüklenemedi. İnternet bağlantınızı kontrol edin.");
-                    }
-
                     const gifReader = new GifReaderClass(uint8Array);
+
                     originalWidth = gifReader.width;
                     originalHeight = gifReader.height;
 
-                    document.getElementById('width-input').value = originalWidth;
-                    document.getElementById('height-input').value = originalHeight;
-                    document.getElementById('crop-w').value = originalWidth;
-                    document.getElementById('crop-h').value = originalHeight;
+                    cropData = { x: 0, y: 0, w: originalWidth, h: originalHeight };
+                    updateInputsFromCropData();
 
                     parsedFrames = [];
                     const numFrames = gifReader.numFrames();
@@ -358,16 +376,18 @@
 
                     dropInstructions.style.display = 'none';
                     previewCanvas.style.display = 'block';
+                    cropBox.style.display = 'block';
+
+                    previewCanvas.width = originalWidth;
+                    previewCanvas.height = originalHeight;
+
                     hideStatus();
+                    syncCropBoxUI();
                     startPreview();
 
                 } catch (err) {
                     showStatus('Hata: ' + err.message, true);
                 }
-            };
-
-            reader.onerror = function () {
-                showStatus('Dosya okuma hatası oluştu.', true);
             };
 
             reader.readAsArrayBuffer(file);
@@ -381,14 +401,6 @@
             function render(now) {
                 if (parsedFrames.length === 0) return;
 
-                const cropX = parseInt(document.getElementById('crop-x').value) || 0;
-                const cropY = parseInt(document.getElementById('crop-y').value) || 0;
-                const cropW = parseInt(document.getElementById('crop-w').value) || originalWidth;
-                const cropH = parseInt(document.getElementById('crop-h').value) || originalHeight;
-
-                previewCanvas.width = cropW;
-                previewCanvas.height = cropH;
-
                 const currentFrame = parsedFrames[currentFrameIndex];
                 const delay = currentFrame.delay > 0 ? currentFrame.delay : 100;
 
@@ -397,8 +409,8 @@
                     lastTime = now;
                 }
 
-                ctx.clearRect(0, 0, cropW, cropH);
-                ctx.drawImage(currentFrame.canvas, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
+                ctx.clearRect(0, 0, originalWidth, originalHeight);
+                ctx.drawImage(currentFrame.canvas, 0, 0);
 
                 const text = document.getElementById('text-input').value;
                 if (text) {
@@ -418,19 +430,125 @@
             animationFrameId = requestAnimationFrame(render);
         }
 
-        document.getElementById('export-btn').addEventListener('click', () => {
-            if (parsedFrames.length === 0) {
-                showStatus('Lütfen önce bir GIF yükleyin.', true);
-                return;
+        // Kırpma Kutusunu Ekrana Senkronize Etme
+        function getScaleRatio() {
+            if (!previewCanvas.clientWidth) return 1;
+            return previewCanvas.clientWidth / originalWidth;
+        }
+
+        function syncCropBoxUI() {
+            const scale = getScaleRatio();
+            cropBox.style.left = (cropData.x * scale) + 'px';
+            cropBox.style.top = (cropData.y * scale) + 'px';
+            cropBox.style.width = (cropData.w * scale) + 'px';
+            cropBox.style.height = (cropData.h * scale) + 'px';
+        }
+
+        function updateInputsFromCropData() {
+            document.getElementById('crop-x').value = Math.round(cropData.x);
+            document.getElementById('crop-y').value = Math.round(cropData.y);
+            document.getElementById('crop-w').value = Math.round(cropData.w);
+            document.getElementById('crop-h').value = Math.round(cropData.h);
+            document.getElementById('width-input').value = Math.round(cropData.w);
+            document.getElementById('height-input').value = Math.round(cropData.h);
+        }
+
+        // İnteraktif Sürükle & Boyutlandır Mantığı
+        let isDragging = false;
+        let isResizing = false;
+        let currentHandle = null;
+        let startX, startY, startCropX, startCropY, startCropW, startCropH;
+
+        cropBox.addEventListener('mousedown', e => {
+            e.stopPropagation();
+            const scale = getScaleRatio();
+            startX = e.clientX;
+            startY = e.clientY;
+
+            if (e.target.classList.contains('handle')) {
+                isResizing = true;
+                currentHandle = e.target;
+            } else {
+                isDragging = true;
             }
 
+            startCropX = cropData.x;
+            startCropY = cropData.y;
+            startCropW = cropData.w;
+            startCropH = cropData.h;
+
+            document.addEventListener('mousemove', onMouseMove);
+            document.addEventListener('mouseup', onMouseUp);
+        });
+
+        function onMouseMove(e) {
+            const scale = getScaleRatio();
+            const dx = (e.clientX - startX) / scale;
+            const dy = (e.clientY - startY) / scale;
+
+            if (isDragging) {
+                cropData.x = Math.max(0, Math.min(originalWidth - cropData.w, startCropX + dx));
+                cropData.y = Math.max(0, Math.min(originalHeight - cropData.h, startCropY + dy));
+            } else if (isResizing) {
+                if (currentHandle.classList.contains('br')) {
+                    cropData.w = Math.max(20, Math.min(originalWidth - startCropX, startCropW + dx));
+                    cropData.h = Math.max(20, Math.min(originalHeight - startCropY, startCropH + dy));
+                } else if (currentHandle.classList.contains('tl')) {
+                    const newW = Math.max(20, startCropW - dx);
+                    const newH = Math.max(20, startCropH - dy);
+                    cropData.x = startCropX + (startCropW - newW);
+                    cropData.y = startCropY + (startCropH - newH);
+                    cropData.w = newW;
+                    cropData.h = newH;
+                } else if (currentHandle.classList.contains('tr')) {
+                    const newH = Math.max(20, startCropH - dy);
+                    cropData.w = Math.max(20, Math.min(originalWidth - startCropX, startCropW + dx));
+                    cropData.y = startCropY + (startCropH - newH);
+                    cropData.h = newH;
+                } else if (currentHandle.classList.contains('bl')) {
+                    const newW = Math.max(20, startCropW - dx);
+                    cropData.x = startCropX + (startCropW - newW);
+                    cropData.w = newW;
+                    cropData.h = Math.max(20, Math.min(originalHeight - startCropY, startCropH + dy));
+                }
+            }
+
+            syncCropBoxUI();
+            updateInputsFromCropData();
+        }
+
+        function onMouseUp() {
+            isDragging = false;
+            isResizing = false;
+            document.removeEventListener('mousemove', onMouseMove);
+            document.removeEventListener('mouseup', onMouseUp);
+        }
+
+        // Input Değişikliklerini Kutucuğa Yansıtma
+        ['crop-x', 'crop-y', 'crop-w', 'crop-h'].forEach(id => {
+            document.getElementById(id).addEventListener('input', () => {
+                cropData.x = parseInt(document.getElementById('crop-x').value) || 0;
+                cropData.y = parseInt(document.getElementById('crop-y').value) || 0;
+                cropData.w = parseInt(document.getElementById('crop-w').value) || originalWidth;
+                cropData.h = parseInt(document.getElementById('crop-h').value) || originalHeight;
+                syncCropBoxUI();
+            });
+        });
+
+        document.getElementById('reset-crop-btn').addEventListener('click', () => {
+            cropData = { x: 0, y: 0, w: originalWidth, h: originalHeight };
+            updateInputsFromCropData();
+            syncCropBoxUI();
+        });
+
+        // Dışa Aktarma
+        document.getElementById('export-btn').addEventListener('click', () => {
+            if (parsedFrames.length === 0) return;
+
             showStatus('Dışa aktarılıyor...', false);
-            const targetW = parseInt(document.getElementById('width-input').value) || originalWidth;
-            const targetH = parseInt(document.getElementById('height-input').value) || originalHeight;
-            const cropX = parseInt(document.getElementById('crop-x').value) || 0;
-            const cropY = parseInt(document.getElementById('crop-y').value) || 0;
-            const cropW = parseInt(document.getElementById('crop-w').value) || originalWidth;
-            const cropH = parseInt(document.getElementById('crop-h').value) || originalHeight;
+
+            const targetW = parseInt(document.getElementById('width-input').value) || cropData.w;
+            const targetH = parseInt(document.getElementById('height-input').value) || cropData.h;
 
             const text = document.getElementById('text-input').value;
             const textSize = document.getElementById('text-size').value;
@@ -438,41 +556,53 @@
             const textX = parseInt(document.getElementById('text-x').value) || 0;
             const textY = parseInt(document.getElementById('text-y').value) || 0;
 
-            try {
-                const gif = new GIF({
-                    workers: 1,
-                    quality: 10,
-                    width: targetW,
-                    height: targetH
-                });
+            const format = document.getElementById('export-format').value;
 
-                parsedFrames.forEach(frameObj => {
-                    const c = document.createElement('canvas');
-                    c.width = targetW;
-                    c.height = targetH;
-                    const cCtx = c.getContext('2d');
+            const processedCanvases = parsedFrames.map(frameObj => {
+                const c = document.createElement('canvas');
+                c.width = targetW;
+                c.height = targetH;
+                const cCtx = c.getContext('2d');
 
-                    cCtx.drawImage(frameObj.canvas, cropX, cropY, cropW, cropH, 0, 0, targetW, targetH);
+                // Kırpılan alanı alıp hedef boyuta aktarma
+                cCtx.drawImage(
+                    frameObj.canvas,
+                    cropData.x, cropData.y, cropData.w, cropData.h,
+                    0, 0, targetW, targetH
+                );
 
-                    if (text) {
-                        cCtx.font = `${textSize}px Arial`;
-                        cCtx.fillStyle = textColor;
-                        cCtx.fillText(text, textX, textY);
-                    }
+                if (text) {
+                    cCtx.font = `${textSize}px Arial`;
+                    cCtx.fillStyle = textColor;
+                    cCtx.fillText(text, textX, textY);
+                }
+                return { canvas: c, delay: frameObj.delay };
+            });
 
-                    gif.addFrame(c, { delay: frameObj.delay });
-                });
+            if (format === 'gif') {
+                const gifOptions = { workers: 2, quality: 10, width: targetW, height: targetH };
+                if (workerBlobUrl) gifOptions.workerScript = workerBlobUrl;
+
+                const gif = new GIF(gifOptions);
+                processedCanvases.forEach(item => gif.addFrame(item.canvas, { delay: item.delay }));
 
                 gif.on('finished', blob => {
-                    const format = document.getElementById('export-format').value;
-                    const ext = format === 'apng' ? 'png' : 'gif';
-                    downloadFile(blob, `edited.${ext}`);
+                    downloadFile(blob, 'edited.gif');
                     hideStatus();
                 });
-
                 gif.render();
-            } catch (e) {
-                showStatus('Dışa aktarma hatası: ' + e.message, true);
+
+            } else if (format === 'apng') {
+                const imgs = [];
+                const delays = [];
+                processedCanvases.forEach(item => {
+                    imgs.push(item.canvas.getContext('2d').getImageData(0, 0, targetW, targetH).data.buffer);
+                    delays.push(item.delay);
+                });
+
+                const apngBuffer = UPNG.encode(imgs, targetW, targetH, 0, delays);
+                downloadFile(new Blob([apngBuffer], { type: 'image/png' }), 'edited.png');
+                hideStatus();
             }
         });
 
@@ -488,16 +618,14 @@
         function showStatus(text, isError) {
             statusBar.innerText = text;
             statusBar.style.display = 'block';
-            if (isError) {
-                statusBar.classList.add('error');
-            } else {
-                statusBar.classList.remove('error');
-            }
+            statusBar.className = isError ? 'error' : '';
         }
 
         function hideStatus() {
             statusBar.style.display = 'none';
         }
+
+        window.addEventListener('resize', syncCropBoxUI);
     </script>
 </body>
 </html>
