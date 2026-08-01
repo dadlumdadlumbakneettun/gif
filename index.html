@@ -132,9 +132,9 @@
             display: block;
             max-width: 100%;
             max-height: 80vh;
+            background: #000;
         }
 
-        /* İnteraktif Kırpma Kutusu */
         #crop-box {
             position: absolute;
             border: 2px dashed #6366f1;
@@ -187,9 +187,8 @@
         </div>
 
         <div class="section">
-            <h2>Kırpma Ayarları</h2>
-            <p style="font-size: 0.75rem; color: #9ca3af; margin-top: 0;">Görsel üzerindeki mavi kutuyu fare ile sürükleyip boyutlandırabilirsiniz.</p>
-            <button id="reset-crop-btn" style="background: #374151; margin-bottom: 10px;">Kırpmayı Sıfırla</button>
+            <h2>Kırpma / Çerçeve Ayarları</h2>
+            <button id="fit-1200-btn" style="background: #10b981; margin-bottom: 10px;">1200x134 Siyah Doldur / Sıfırla</button>
             <div class="row">
                 <div>
                     <label>Sol (X)</label>
@@ -217,11 +216,11 @@
             <div class="row">
                 <div>
                     <label>Genişlik (px)</label>
-                    <input type="number" id="width-input">
+                    <input type="number" id="width-input" value="1200">
                 </div>
                 <div>
                     <label>Yükseklik (px)</label>
-                    <input type="number" id="height-input">
+                    <input type="number" id="height-input" value="134">
                 </div>
             </div>
         </div>
@@ -296,7 +295,6 @@
         let currentFrameIndex = 0;
         let workerBlobUrl = null;
 
-        // Görsel üzerindeki kırpma parametreleri (Orijinal piksel ölçeğinde)
         let cropData = { x: 0, y: 0, w: 0, h: 0 };
 
         async function initWorker() {
@@ -308,7 +306,6 @@
         }
         initWorker();
 
-        // Drag & Drop
         ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(evt => {
             editorContainer.addEventListener(evt, e => { e.preventDefault(); e.stopPropagation(); });
             document.body.addEventListener(evt, e => { e.preventDefault(); e.stopPropagation(); });
@@ -334,9 +331,6 @@
 
                     originalWidth = gifReader.width;
                     originalHeight = gifReader.height;
-
-                    cropData = { x: 0, y: 0, w: originalWidth, h: originalHeight };
-                    updateInputsFromCropData();
 
                     parsedFrames = [];
                     const numFrames = gifReader.numFrames();
@@ -378,11 +372,8 @@
                     previewCanvas.style.display = 'block';
                     cropBox.style.display = 'block';
 
-                    previewCanvas.width = originalWidth;
-                    previewCanvas.height = originalHeight;
-
+                    autoFit1200x134();
                     hideStatus();
-                    syncCropBoxUI();
                     startPreview();
 
                 } catch (err) {
@@ -391,6 +382,18 @@
             };
 
             reader.readAsArrayBuffer(file);
+        }
+
+        function autoFit1200x134() {
+            const targetRatio = 1200 / 134;
+            const cropH = originalHeight;
+            const cropW = cropH * targetRatio;
+            const cropX = - (cropW - originalWidth) / 2;
+            const cropY = 0;
+
+            cropData = { x: cropX, y: cropY, w: cropW, h: cropH };
+            updateInputsFromCropData();
+            syncCropBoxUI();
         }
 
         function startPreview() {
@@ -409,7 +412,11 @@
                     lastTime = now;
                 }
 
-                ctx.clearRect(0, 0, originalWidth, originalHeight);
+                previewCanvas.width = originalWidth;
+                previewCanvas.height = originalHeight;
+
+                ctx.fillStyle = '#000000';
+                ctx.fillRect(0, 0, originalWidth, originalHeight);
                 ctx.drawImage(currentFrame.canvas, 0, 0);
 
                 const text = document.getElementById('text-input').value;
@@ -430,7 +437,6 @@
             animationFrameId = requestAnimationFrame(render);
         }
 
-        // Kırpma Kutusunu Ekrana Senkronize Etme
         function getScaleRatio() {
             if (!previewCanvas.clientWidth) return 1;
             return previewCanvas.clientWidth / originalWidth;
@@ -449,11 +455,8 @@
             document.getElementById('crop-y').value = Math.round(cropData.y);
             document.getElementById('crop-w').value = Math.round(cropData.w);
             document.getElementById('crop-h').value = Math.round(cropData.h);
-            document.getElementById('width-input').value = Math.round(cropData.w);
-            document.getElementById('height-input').value = Math.round(cropData.h);
         }
 
-        // İnteraktif Sürükle & Boyutlandır Mantığı
         let isDragging = false;
         let isResizing = false;
         let currentHandle = null;
@@ -461,7 +464,6 @@
 
         cropBox.addEventListener('mousedown', e => {
             e.stopPropagation();
-            const scale = getScaleRatio();
             startX = e.clientX;
             startY = e.clientY;
 
@@ -487,12 +489,12 @@
             const dy = (e.clientY - startY) / scale;
 
             if (isDragging) {
-                cropData.x = Math.max(0, Math.min(originalWidth - cropData.w, startCropX + dx));
-                cropData.y = Math.max(0, Math.min(originalHeight - cropData.h, startCropY + dy));
+                cropData.x = startCropX + dx;
+                cropData.y = startCropY + dy;
             } else if (isResizing) {
                 if (currentHandle.classList.contains('br')) {
-                    cropData.w = Math.max(20, Math.min(originalWidth - startCropX, startCropW + dx));
-                    cropData.h = Math.max(20, Math.min(originalHeight - startCropY, startCropH + dy));
+                    cropData.w = Math.max(20, startCropW + dx);
+                    cropData.h = Math.max(20, startCropH + dy);
                 } else if (currentHandle.classList.contains('tl')) {
                     const newW = Math.max(20, startCropW - dx);
                     const newH = Math.max(20, startCropH - dy);
@@ -502,14 +504,14 @@
                     cropData.h = newH;
                 } else if (currentHandle.classList.contains('tr')) {
                     const newH = Math.max(20, startCropH - dy);
-                    cropData.w = Math.max(20, Math.min(originalWidth - startCropX, startCropW + dx));
+                    cropData.w = Math.max(20, startCropW + dx);
                     cropData.y = startCropY + (startCropH - newH);
                     cropData.h = newH;
                 } else if (currentHandle.classList.contains('bl')) {
                     const newW = Math.max(20, startCropW - dx);
                     cropData.x = startCropX + (startCropW - newW);
                     cropData.w = newW;
-                    cropData.h = Math.max(20, Math.min(originalHeight - startCropY, startCropH + dy));
+                    cropData.h = Math.max(20, startCropH + dy);
                 }
             }
 
@@ -524,31 +526,27 @@
             document.removeEventListener('mouseup', onMouseUp);
         }
 
-        // Input Değişikliklerini Kutucuğa Yansıtma
         ['crop-x', 'crop-y', 'crop-w', 'crop-h'].forEach(id => {
             document.getElementById(id).addEventListener('input', () => {
-                cropData.x = parseInt(document.getElementById('crop-x').value) || 0;
-                cropData.y = parseInt(document.getElementById('crop-y').value) || 0;
-                cropData.w = parseInt(document.getElementById('crop-w').value) || originalWidth;
-                cropData.h = parseInt(document.getElementById('crop-h').value) || originalHeight;
+                cropData.x = parseFloat(document.getElementById('crop-x').value) || 0;
+                cropData.y = parseFloat(document.getElementById('crop-y').value) || 0;
+                cropData.w = parseFloat(document.getElementById('crop-w').value) || originalWidth;
+                cropData.h = parseFloat(document.getElementById('crop-h').value) || originalHeight;
                 syncCropBoxUI();
             });
         });
 
-        document.getElementById('reset-crop-btn').addEventListener('click', () => {
-            cropData = { x: 0, y: 0, w: originalWidth, h: originalHeight };
-            updateInputsFromCropData();
-            syncCropBoxUI();
+        document.getElementById('fit-1200-btn').addEventListener('click', () => {
+            autoFit1200x134();
         });
 
-        // Dışa Aktarma
         document.getElementById('export-btn').addEventListener('click', () => {
             if (parsedFrames.length === 0) return;
 
             showStatus('Dışa aktarılıyor...', false);
 
-            const targetW = parseInt(document.getElementById('width-input').value) || cropData.w;
-            const targetH = parseInt(document.getElementById('height-input').value) || cropData.h;
+            const targetW = parseInt(document.getElementById('width-input').value) || 1200;
+            const targetH = parseInt(document.getElementById('height-input').value) || 134;
 
             const text = document.getElementById('text-input').value;
             const textSize = document.getElementById('text-size').value;
@@ -558,17 +556,27 @@
 
             const format = document.getElementById('export-format').value;
 
+            const scaleX = targetW / cropData.w;
+            const scaleY = targetH / cropData.h;
+
+            const destX = (0 - cropData.x) * scaleX;
+            const destY = (0 - cropData.y) * scaleY;
+            const destW = originalWidth * scaleX;
+            const destH = originalHeight * scaleY;
+
             const processedCanvases = parsedFrames.map(frameObj => {
                 const c = document.createElement('canvas');
                 c.width = targetW;
                 c.height = targetH;
                 const cCtx = c.getContext('2d');
 
-                // Kırpılan alanı alıp hedef boyuta aktarma
+                cCtx.fillStyle = '#000000';
+                cCtx.fillRect(0, 0, targetW, targetH);
+
                 cCtx.drawImage(
                     frameObj.canvas,
-                    cropData.x, cropData.y, cropData.w, cropData.h,
-                    0, 0, targetW, targetH
+                    0, 0, originalWidth, originalHeight,
+                    destX, destY, destW, destH
                 );
 
                 if (text) {
