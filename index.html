@@ -6,6 +6,8 @@
     <title>GIF Düzenleyici</title>
     <script src="https://cdn.jsdelivr.net/npm/omggif@1.0.10/omggif.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/gif.js@0.2.0/dist/gif.js"></script>
+    <!-- APNG Sıkıştırma Bağımlılığı -->
+    <script src="https://cdn.jsdelivr.net/npm/pako@2.1.0/dist/pako.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/upng-js@2.1.0/UPNG.min.js"></script>
     <style>
         :root {
@@ -119,7 +121,7 @@
             border: 2px dashed var(--border-color);
             border-radius: 8px;
             overflow: hidden;
-            background: #000;
+            background: #18181b;
         }
 
         #drop-instructions {
@@ -132,16 +134,15 @@
             display: block;
             max-width: 100%;
             max-height: 80vh;
-            background: #000;
         }
 
         #crop-box {
             position: absolute;
             border: 2px dashed #6366f1;
-            background: rgba(99, 102, 241, 0.15);
             box-sizing: border-box;
             cursor: move;
             display: none;
+            pointer-events: auto;
         }
 
         .handle {
@@ -296,6 +297,7 @@
         let workerBlobUrl = null;
 
         let cropData = { x: 0, y: 0, w: 0, h: 0 };
+        let viewBounds = { minX: 0, minY: 0, viewW: 0, viewH: 0 };
 
         async function initWorker() {
             try {
@@ -396,6 +398,20 @@
             syncCropBoxUI();
         }
 
+        function calculateViewBounds() {
+            const minX = Math.min(0, cropData.x);
+            const minY = Math.min(0, cropData.y);
+            const maxX = Math.max(originalWidth, cropData.x + cropData.w);
+            const maxY = Math.max(originalHeight, cropData.y + cropData.h);
+
+            viewBounds = {
+                minX: minX,
+                minY: minY,
+                viewW: maxX - minX,
+                viewH: maxY - minY
+            };
+        }
+
         function startPreview() {
             if (animationFrameId) cancelAnimationFrame(animationFrameId);
             let lastTime = performance.now();
@@ -412,13 +428,27 @@
                     lastTime = now;
                 }
 
-                previewCanvas.width = originalWidth;
-                previewCanvas.height = originalHeight;
+                calculateViewBounds();
 
+                previewCanvas.width = viewBounds.viewW;
+                previewCanvas.height = viewBounds.viewH;
+
+                // 1. Dış Alan Temizliği
+                ctx.clearRect(0, 0, viewBounds.viewW, viewBounds.viewH);
+
+                // 2. Siyah Kırpma/Çerçeve Alanını Çiz
                 ctx.fillStyle = '#000000';
-                ctx.fillRect(0, 0, originalWidth, originalHeight);
-                ctx.drawImage(currentFrame.canvas, 0, 0);
+                ctx.fillRect(
+                    cropData.x - viewBounds.minX,
+                    cropData.y - viewBounds.minY,
+                    cropData.w,
+                    cropData.h
+                );
 
+                // 3. Orijinal GIF karesini çiz
+                ctx.drawImage(currentFrame.canvas, -viewBounds.minX, -viewBounds.minY);
+
+                // 4. Metin Katmanı
                 const text = document.getElementById('text-input').value;
                 if (text) {
                     const textSize = document.getElementById('text-size').value;
@@ -428,7 +458,7 @@
 
                     ctx.font = `${textSize}px Arial`;
                     ctx.fillStyle = textColor;
-                    ctx.fillText(text, textX, textY);
+                    ctx.fillText(text, textX - viewBounds.minX, textY - viewBounds.minY);
                 }
 
                 animationFrameId = requestAnimationFrame(render);
@@ -438,14 +468,16 @@
         }
 
         function getScaleRatio() {
-            if (!previewCanvas.clientWidth) return 1;
-            return previewCanvas.clientWidth / originalWidth;
+            if (!previewCanvas.clientWidth || !viewBounds.viewW) return 1;
+            return previewCanvas.clientWidth / viewBounds.viewW;
         }
 
         function syncCropBoxUI() {
+            calculateViewBounds();
             const scale = getScaleRatio();
-            cropBox.style.left = (cropData.x * scale) + 'px';
-            cropBox.style.top = (cropData.y * scale) + 'px';
+
+            cropBox.style.left = ((cropData.x - viewBounds.minX) * scale) + 'px';
+            cropBox.style.top = ((cropData.y - viewBounds.minY) * scale) + 'px';
             cropBox.style.width = (cropData.w * scale) + 'px';
             cropBox.style.height = (cropData.h * scale) + 'px';
         }
@@ -601,16 +633,23 @@
                 gif.render();
 
             } else if (format === 'apng') {
-                const imgs = [];
-                const delays = [];
-                processedCanvases.forEach(item => {
-                    imgs.push(item.canvas.getContext('2d').getImageData(0, 0, targetW, targetH).data.buffer);
-                    delays.push(item.delay);
-                });
+                try {
+                    if (!window.UPNG) throw new Error("UPNG kütüphanesi yüklenemedi.");
 
-                const apngBuffer = UPNG.encode(imgs, targetW, targetH, 0, delays);
-                downloadFile(new Blob([apngBuffer], { type: 'image/png' }), 'edited.png');
-                hideStatus();
+                    const imgs = [];
+                    const delays = [];
+                    processedCanvases.forEach(item => {
+                        const imgData = item.canvas.getContext('2d').getImageData(0, 0, targetW, targetH).data.buffer;
+                        imgs.push(imgData);
+                        delays.push(item.delay);
+                    });
+
+                    const apngBuffer = UPNG.encode(imgs, targetW, targetH, 0, delays);
+                    downloadFile(new Blob([apngBuffer], { type: 'image/png' }), 'edited.png');
+                    hideStatus();
+                } catch (err) {
+                    showStatus('APNG Hatası: ' + err.message, true);
+                }
             }
         });
 
