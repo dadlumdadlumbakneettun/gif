@@ -238,6 +238,22 @@
         </div>
 
         <div class="section">
+            <h2>Boyut Düşürme / Optimazyon</h2>
+            <label>Kare Atlama (Boyut Küçültme)</label>
+            <select id="frame-step">
+                <option value="1">Her Kareyi Al (Orijinal FPS / En Büyük Boyut)</option>
+                <option value="2" selected>2 Karede 1 Al (Boyutu %50 Düşürür)</option>
+                <option value="3">3 Karede 1 Al (Boyutu %66 Düşürür)</option>
+            </select>
+            <label>Sıkıştırma Kalitesi (GIF)</label>
+            <select id="gif-quality">
+                <option value="10">Standart Kalite (Hızlı)</option>
+                <option value="20" selected>Yüksek Sıkıştırma (Düşük Boyut)</option>
+                <option value="30">Maksimum Sıkıştırma</option>
+            </select>
+        </div>
+
+        <div class="section">
             <h2>Yazı Ekle</h2>
             <label>Metin</label>
             <input type="text" id="text-input" placeholder="Yazı yazın...">
@@ -305,7 +321,7 @@
         let viewBounds = { minX: 0, minY: 0, viewW: 0, viewH: 0 };
 
         let isInteracting = false;
-        let dragMode = null; // 'move-gif', 'move-frame', 'resize-handle'
+        let dragMode = null;
         let activeHandle = null;
         let dragStartX = 0, dragStartY = 0;
         let startCrop = {}, startGif = {};
@@ -690,6 +706,8 @@
             const textY = parseInt(document.getElementById('text-y').value) || 0;
 
             const format = document.getElementById('export-format').value;
+            const step = parseInt(document.getElementById('frame-step').value) || 1;
+            const quality = parseInt(document.getElementById('gif-quality').value) || 10;
 
             const scaleX = targetW / cropData.w;
             const scaleY = targetH / cropData.h;
@@ -699,7 +717,20 @@
             const renderGifW = gifData.w * scaleX;
             const renderGifH = gifData.h * scaleY;
 
-            const processedCanvases = parsedFrames.map(frameObj => {
+            // Kare Atlama (Sampling) Uygula
+            const sampledFrames = [];
+            for (let i = 0; i < parsedFrames.length; i += step) {
+                let accumulatedDelay = 0;
+                for (let j = 0; j < step && (i + j) < parsedFrames.length; j++) {
+                    accumulatedDelay += parsedFrames[i + j].delay;
+                }
+                sampledFrames.push({
+                    canvas: parsedFrames[i].canvas,
+                    delay: accumulatedDelay
+                });
+            }
+
+            const processedCanvases = sampledFrames.map(frameObj => {
                 const c = document.createElement('canvas');
                 c.width = targetW;
                 c.height = targetH;
@@ -726,7 +757,7 @@
             });
 
             if (format === 'gif') {
-                const gifOptions = { workers: 2, quality: 10, width: targetW, height: targetH };
+                const gifOptions = { workers: 2, quality: quality, width: targetW, height: targetH };
                 if (workerBlobUrl) gifOptions.workerScript = workerBlobUrl;
 
                 const gif = new GIF(gifOptions);
@@ -759,7 +790,7 @@
 
         function downloadFile(blob, filename) {
             const url = URL.createObjectURL(blob);
-            const a = document.append ? document.createElement('a') : document.createElement('a');
+            const a = document.createElement('a');
             a.href = url;
             a.download = filename;
             a.click();
